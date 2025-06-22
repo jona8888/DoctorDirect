@@ -3,6 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <title>Find a Doctor</title>
+  <style>
+    .spin {
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0%   { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
 </head>
 <body>
   <h1>Find a Doctor</h1>
@@ -52,21 +62,33 @@
       <button type="submit">Search</button>
       <button type="button" id="clearBtn">Clear</button>
     </div>
-
   </form>
 
+  <div id="spinner" style="display: none; text-align: center; margin-top: 20px;">
+    <img src="/static/spinner.gif" alt="Loading..." width="50" />
+    <p>Searching...</p>
+  </div>
+
   <pre id="results"></pre>
+
 
   <script>
     document.getElementById("lookupForm").addEventListener("submit", async function(e) {
       e.preventDefault();
+
+      const spinner = document.getElementById("spinner");
+      const resultsBox = document.getElementById("results");
+
+      spinner.style.display = "block";
+      resultsBox.textContent = "";
+
       const condition = document.getElementById("condition").value.trim();
       const symptom = document.getElementById("symptom").value.trim();
       const zip1 = document.getElementById("zip1").value.trim();
       const zip2 = document.getElementById("zip2").value.trim();
 
       let zip = '';
-      let radius = 10; // default
+      let radius = 10;
 
       if (zip1) {
         zip = zip1;
@@ -75,7 +97,8 @@
         zip = zip2;
         radius = document.getElementById("radius2").value;
       } else {
-        document.getElementById("results").textContent = "Please enter a ZIP code.";
+        spinner.style.display = "none";
+        resultsBox.textContent = "Please enter a ZIP code.";
         return;
       }
 
@@ -84,13 +107,14 @@
       try {
         const res = await fetch(url);
         const data = await res.json();
-        document.getElementById("results").textContent = JSON.stringify(data, null, 2);
+        resultsBox.textContent = JSON.stringify(data, null, 2);
       } catch (error) {
-        document.getElementById("results").textContent = 'Error fetching results.';
+        resultsBox.textContent = 'Error fetching results.';
+      } finally {
+        spinner.style.display = "none";
       }
     });
 
-    // Clear button handler
     document.getElementById("clearBtn").addEventListener("click", function() {
       document.getElementById("condition").value = "";
       document.getElementById("symptom").value = "";
@@ -103,4 +127,3 @@
   </script>
 </body>
 </html>
-#
