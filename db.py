@@ -20,3 +20,32 @@ def log_search(condition, zip_code):
     c.execute('INSERT INTO search_logs (condition, zip_code) VALUES (?, ?)', (condition, zip_code))
     conn.commit()
     conn.close()
+
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import UserMixin
+from werkzeug.security import generate_password_hash, check_password_hash
+
+db = SQLAlchemy()
+
+class User(UserMixin, db.Model):
+    id       = db.Column(db.Integer, primary_key=True)
+    email    = db.Column(db.String(120), unique=True, nullable=False)
+    password = db.Column(db.String(200), nullable=False)
+    created  = db.Column(db.DateTime, server_default=db.func.now())
+
+    def set_password(self, plain_pw):
+        self.password = generate_password_hash(plain_pw)
+
+    def check_password(self, plain_pw):
+        return check_password_hash(self.password, plain_pw)
+
+class Search(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    condition = db.Column(db.String(100))
+    symptom = db.Column(db.String(100))
+    zip_code = db.Column(db.String(10))
+    radius = db.Column(db.Integer)
+    timestamp = db.Column(db.DateTime, server_default=db.func.now())
+
+    user = db.relationship("User", backref="searches")

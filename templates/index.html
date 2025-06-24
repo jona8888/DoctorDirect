@@ -7,7 +7,6 @@
     .spin {
       animation: spin 1s linear infinite;
     }
-
     @keyframes spin {
       0%   { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
@@ -18,15 +17,12 @@
   <h1>Find a Doctor</h1>
 
   <form id="lookupForm">
-    <!-- Condition Section -->
     <fieldset style="margin-bottom: 20px; padding: 10px;">
       <legend><strong>Search by Condition</strong></legend>
       <label for="condition">Condition:</label>
       <input type="text" id="condition" name="condition" placeholder="e.g. diabetes"><br><br>
-      
       <label for="zip1">ZIP Code:</label>
       <input type="text" id="zip1" name="zip1" placeholder="e.g. 10001"><br><br>
-      
       <label for="radius1">Search Radius (miles):</label>
       <select id="radius1" name="radius1">
         <option value="5">5 miles</option>
@@ -39,15 +35,12 @@
 
     <div style="text-align: center;"><strong>— OR —</strong></div>
 
-    <!-- Symptom Section -->
     <fieldset style="margin-top: 20px; padding: 10px;">
       <legend><strong>Search by Symptom</strong></legend>
       <label for="symptom">Symptom:</label>
       <input type="text" id="symptom" name="symptom" placeholder="e.g. chest pain"><br><br>
-
       <label for="zip2">ZIP Code:</label>
       <input type="text" id="zip2" name="zip2" placeholder="e.g. 10001"><br><br>
-
       <label for="radius2">Search Radius (miles):</label>
       <select id="radius2" name="radius2">
         <option value="5">5 miles</option>
@@ -71,11 +64,30 @@
 
   <pre id="results"></pre>
 
+  <hr>
+  <h3>Register</h3>
+  <input type="email" id="reg-email" placeholder="Email">
+  <input type="password" id="reg-password" placeholder="Password">
+  <button onclick="register()">Register</button>
+
+  <h3>Login</h3>
+  <input type="email" id="log-email" placeholder="Email">
+  <input type="password" id="log-password" placeholder="Password">
+  <button onclick="login()">Login</button>
+
+  <div id="historyControls" style="display: none;">
+    <hr>
+    <h3>My Search History</h3>
+    <button onclick="getHistory()">View Search History</button>
+    <button onclick="toggleHistory()">Hide History</button>
+    <div id="historyContainer" style="display: none;">
+      <pre id="historyBox"></pre>
+    </div>
+  </div>
 
   <script>
     document.getElementById("lookupForm").addEventListener("submit", async function(e) {
       e.preventDefault();
-
       const spinner = document.getElementById("spinner");
       const resultsBox = document.getElementById("results");
 
@@ -124,6 +136,71 @@
       document.getElementById("radius2").value = "10";
       document.getElementById("results").textContent = "";
     });
+
+    function register() {
+      const email = document.getElementById("reg-email").value;
+      const password = document.getElementById("reg-password").value;
+
+      fetch("/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email, password })
+      })
+      .then(res => res.json())
+      .then(data => alert("Register: " + JSON.stringify(data)))
+      .catch(err => console.error(err));
+    }
+
+    function login() {
+      const email = document.getElementById("log-email").value;
+      const password = document.getElementById("log-password").value;
+
+      fetch("/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email, password })
+      })
+      .then(res => res.json())
+      .then(data => {
+        alert("Login: " + JSON.stringify(data));
+        // Show history section after login
+        document.getElementById("historyControls").style.display = "block";
+      })
+      .catch(err => console.error(err));
+    }
+
+    function getHistory() {
+      fetch("/search_history", {
+        method: "GET",
+        credentials: "include"
+      })
+      .then(res => {
+        if (!res.ok) throw new Error("Not authorized or server error");
+        return res.json();
+      })
+      .then(data => {
+        const historyBox = document.getElementById("historyBox");
+        if (Array.isArray(data) && data.length > 0) {
+          historyBox.textContent = JSON.stringify(data, null, 2);
+          document.getElementById("historyContainer").style.display = "block";
+        } else {
+          historyBox.textContent = "No search history found.";
+          document.getElementById("historyContainer").style.display = "block";
+        }
+      })
+      .catch(err => {
+        console.error("Error fetching history:", err);
+        document.getElementById("historyBox").textContent = "Failed to load search history.";
+        document.getElementById("historyContainer").style.display = "block";
+      });
+    }
+
+    function toggleHistory() {
+      const container = document.getElementById("historyContainer");
+      container.style.display = container.style.display === "none" ? "block" : "none";
+    }
   </script>
 </body>
 </html>

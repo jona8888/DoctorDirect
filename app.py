@@ -1,8 +1,26 @@
 from flask import Flask, request, jsonify, render_template
 import requests
 from utils import load_zip_coords, find_nearby_zips  
+from db import db, User, Search
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask import session
 
 app = Flask(__name__)
+
+app.config["SECRET_KEY"] = "super-secret-key"  # change this to something secure
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///doctorapp.db"
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+db.init_app(app)
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = "login"
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
 zip_coords = load_zip_coords()
 
 condition_to_specialty = {
@@ -50,7 +68,6 @@ def format_zip(zip_code):
         return zip_code[:5] + "-" + zip_code[5:]
     return zip_code
 
-
 @app.route('/lookup', methods=['GET'])
 def lookup_doctors():
     condition = request.args.get('condition', '').lower()
@@ -76,12 +93,10 @@ def lookup_doctors():
                 specialty = mapped_specialty
                 break
 
-
     if not specialty:
         return jsonify({"error": "Could not determine specialty from input"}), 400
 
     nearby_zips = find_nearby_zips(zip_code, radius, zip_coords)
-
 
     results = []
     for z in nearby_zips:
@@ -102,7 +117,6 @@ def lookup_doctors():
                             "address": f"{address.get('address_1', '')}, {address.get('city', '')}, {address.get('state', '')} {formatted_zip}",
                             "phone": address.get("telephone_number", "")
                         })
-
             else:
                 print(f"NPI API call failed for ZIP {z} with status {response.status_code}")
         except Exception as e:
@@ -111,7 +125,74 @@ def lookup_doctors():
     if not results:
         return jsonify({"message": "No doctors found in the selected area."})
 
+    # ✅ Log the search
+    if current_user.is_authenticated:
+        search_entry = Search(
+            user_id=current_user.id,
+            condition=condition or None,
+            symptom=symptom or None,
+            zip_code=zip_code,
+            radius=radius
+        )
+        db.session.add(search_entry)
+        db.session.commit()
+
     return jsonify({"results": results})
 
+@app.route('/register', methods=['POST'])
+def register():
+    data = request.get_json()
+    email = data.get("email")
+    password = data.get("password")
+
+    if not email or not password:
+        return jsonify({"error": "Email and password required"}), 400
+
+    existing_user = User.query.filter_by(email=email).first()
+    if existing_user:
+        return jsonify({"error": "User already exists"}), 409
+
+    user = User(email=email)
+    user.set_password(password)
+    db.session.add(user)
+    db.session.commit()
+    login_user(user)
+    return jsonify({"message": "User registered and logged in"}), 201
+
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    email = data.get("email")
+    password = data.get("password")
+
+    user = User.query.filter_by(email=email).first()
+    if not user or not user.check_password(password):
+        return jsonify({"error": "Invalid credentials"}), 401
+
+    login_user(user)
+    return jsonify({"message": "Logged in"}), 200
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return jsonify({"message": "Logged out"}), 200
+
+@app.route('/search_history')
+@login_required
+def search_history():
+    searches = Search.query.filter_by(user_id=current_user.id).order_by(Search.timestamp.desc()).all()
+    return jsonify([
+        {
+            "condition": s.condition,
+            "symptom": s.symptom,
+            "zip": s.zip_code,
+            "radius": s.radius,
+            "timestamp": s.timestamp.strftime("%Y-%m-%d %H:%M:%S")
+        } for s in searches
+    ])
+
 if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
     app.run(debug=True)
