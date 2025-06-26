@@ -265,6 +265,8 @@
         document.getElementById("historyContainer").style.display = "none";
         document.getElementById("historyBox").textContent = "";
         document.getElementById("favoritesList").innerHTML = '<p>No favorites yet.</p>'; // clear favorites on logout
+        document.getElementById("results").innerHTML = "";
+
       })
       .catch(err => {
         alert("Error logging out");
