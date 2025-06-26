@@ -65,6 +65,12 @@
   <div id="results"></div>
 
   <hr>
+  <h3>My Favorite Doctors</h3>
+  <div id="favoritesList">
+    <p>No favorites yet.</p>
+  </div>
+
+  <hr>
   <div id="register-section">
     <h3>Register</h3>
     <input type="email" id="reg-email" placeholder="Email">
@@ -158,7 +164,11 @@
                 })
               })
               .then(res => res.json())
-              .then(data => alert(data.message || "Added to favorites"));
+              .then(data => {
+                alert(data.message || "Added to favorites");
+                loadFavorites(); // refresh favorites list after adding
+              })
+              .catch(() => alert("Failed to add favorite"));
             };
 
             card.appendChild(favBtn);
@@ -203,6 +213,7 @@
           document.getElementById("logged-in").style.display = "block";
           document.getElementById("welcome-msg").textContent = `Welcome, ${email}`;
           document.getElementById("historyControls").style.display = "block";
+          loadFavorites(); // load favorites on register/login
         } else {
           alert(data.error || "Registration failed");
         }
@@ -228,6 +239,7 @@
           document.getElementById("logged-in").style.display = "block";
           document.getElementById("welcome-msg").textContent = `Welcome, ${email}`;
           document.getElementById("historyControls").style.display = "block";
+          loadFavorites(); // load favorites on register/login
         } else {
           alert(data.error || "Login failed");
         }
@@ -252,6 +264,7 @@
         document.getElementById("historyControls").style.display = "none";
         document.getElementById("historyContainer").style.display = "none";
         document.getElementById("historyBox").textContent = "";
+        document.getElementById("favoritesList").innerHTML = '<p>No favorites yet.</p>'; // clear favorites on logout
       })
       .catch(err => {
         alert("Error logging out");
@@ -290,6 +303,61 @@
       container.style.display = container.style.display === "none" ? "block" : "none";
     }
 
+    // New function to load favorites
+    function loadFavorites() {
+      fetch('/favorites', { method: 'GET', credentials: 'include' })
+      .then(res => res.json())
+      .then(favorites => {
+        const favList = document.getElementById('favoritesList');
+        favList.innerHTML = '';
+
+        if (favorites.length === 0) {
+          favList.textContent = 'No favorites yet.';
+          return;
+        }
+
+        favorites.forEach(fav => {
+          const div = document.createElement('div');
+          div.style.border = '1px solid #aaa';
+          div.style.margin = '5px';
+          div.style.padding = '5px';
+
+          div.innerHTML = `
+            <strong>${fav.name}</strong><br>
+            ${fav.specialty}<br>
+            ${fav.address}<br>
+            ${fav.phone}<br>
+          `;
+
+          const rmBtn = document.createElement('button');
+          rmBtn.textContent = 'Remove';
+          rmBtn.onclick = () => {
+            fetch('/favorites', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({
+                name: fav.name,
+                address: fav.address
+              })
+            })
+            .then(res => res.json())
+            .then(data => {
+              alert(data.message || 'Removed from favorites');
+              loadFavorites();
+            })
+            .catch(() => alert('Failed to remove favorite'));
+          };
+
+          div.appendChild(rmBtn);
+          favList.appendChild(div);
+        });
+      })
+      .catch(() => {
+        document.getElementById('favoritesList').textContent = 'Failed to load favorites.';
+      });
+    }
+
     window.addEventListener("DOMContentLoaded", () => {
       fetch("/session_status", { credentials: "include" })
         .then(res => res.json())
@@ -300,6 +368,7 @@
             document.getElementById("logged-in").style.display = "block";
             document.getElementById("welcome-msg").textContent = `Welcome, ${data.email}`;
             document.getElementById("historyControls").style.display = "block";
+            loadFavorites(); // <-- load favorites on page load if logged in
           }
         })
         .catch(err => console.error("Session check failed:", err));
