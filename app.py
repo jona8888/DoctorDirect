@@ -5,8 +5,18 @@ from db import db, User, Search
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask import session
+import os
+from db import db, User, Search, Favorite
+
+
+
 
 app = Flask(__name__)
+
+
+basedir = os.path.abspath(os.path.dirname(__file__))
+app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{os.path.join(basedir, 'doctorapp.db')}"
+
 
 app.config["SECRET_KEY"] = "super-secret-key"  # change this to something secure
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///doctorapp.db"
@@ -111,7 +121,11 @@ def lookup_doctors():
                 data = response.json()
                 for item in data.get("results", []):
                     taxonomies = item.get("taxonomies", [])
-                    if any(specialty.lower() in t.get("desc", "").lower() for t in taxonomies):
+                    if any(
+                        t.get("desc") and specialty.lower() in t["desc"].lower()
+                        for t in taxonomies
+                    ):
+
                         basic = item.get("basic", {})
                         address = item.get("addresses", [{}])[0]
                         formatted_zip = format_zip(address.get('postal_code', ''))
@@ -202,6 +216,49 @@ def search_history():
             "timestamp": s.timestamp.strftime("%Y-%m-%d %H:%M:%S")
         } for s in searches
     ])
+
+
+@app.route('/favorites', methods=['GET'])
+@login_required
+def get_favorites():
+    favorites = Favorite.query.filter_by(user_id=current_user.id).all()
+    return jsonify([{
+        "name": f.name,
+        "specialty": f.specialty,
+        "address": f.address,
+        "phone": f.phone
+    } for f in favorites])
+
+@app.route('/favorites', methods=['POST'])
+@login_required
+def add_favorite():
+    data = request.get_json()
+    new_fav = Favorite(
+        user_id=current_user.id,
+        name=data.get("name"),
+        specialty=data.get("specialty"),
+        address=data.get("address"),
+        phone=data.get("phone")
+    )
+    db.session.add(new_fav)
+    db.session.commit()
+    return jsonify({"message": "Doctor added to favorites"}), 201
+
+@app.route('/favorites', methods=['DELETE'])
+@login_required
+def remove_favorite():
+    data = request.get_json()
+    fav = Favorite.query.filter_by(
+        user_id=current_user.id,
+        name=data.get("name"),
+        address=data.get("address")
+    ).first()
+    if fav:
+        db.session.delete(fav)
+        db.session.commit()
+        return jsonify({"message": "Removed from favorites"}), 200
+    return jsonify({"error": "Favorite not found"}), 404
+
 
 if __name__ == '__main__':
     with app.app_context():

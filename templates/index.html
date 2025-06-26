@@ -62,7 +62,7 @@
     <p>Searching...</p>
   </div>
 
-  <pre id="results"></pre>
+  <div id="results"></div>
 
   <hr>
   <div id="register-section">
@@ -101,7 +101,7 @@
       const resultsBox = document.getElementById("results");
 
       spinner.style.display = "block";
-      resultsBox.textContent = "";
+      resultsBox.innerHTML = "";
 
       const condition = document.getElementById("condition").value.trim();
       const symptom = document.getElementById("symptom").value.trim();
@@ -128,7 +128,46 @@
       try {
         const res = await fetch(url);
         const data = await res.json();
-        resultsBox.textContent = JSON.stringify(data, null, 2);
+
+        if (data.results) {
+          const container = document.createElement("div");
+          data.results.forEach(result => {
+            const card = document.createElement("div");
+            card.style.border = "1px solid #ccc";
+            card.style.padding = "10px";
+            card.style.marginBottom = "10px";
+            card.innerHTML = `
+              <strong>${result.name}</strong><br>
+              <em>${result.specialty}</em><br>
+              ${result.address}<br>
+              ${result.phone || ""}<br>
+            `;
+
+            const favBtn = document.createElement("button");
+            favBtn.textContent = "❤️ Favorite";
+            favBtn.onclick = () => {
+              fetch("/favorites", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({
+                  name: result.name,
+                  specialty: result.specialty,
+                  address: result.address,
+                  phone: result.phone
+                })
+              })
+              .then(res => res.json())
+              .then(data => alert(data.message || "Added to favorites"));
+            };
+
+            card.appendChild(favBtn);
+            container.appendChild(card);
+          });
+          resultsBox.appendChild(container);
+        } else {
+          resultsBox.textContent = data.message || "No doctors found.";
+        }
       } catch (error) {
         resultsBox.textContent = 'Error fetching results.';
       } finally {
@@ -143,7 +182,7 @@
       document.getElementById("zip2").value = "";
       document.getElementById("radius1").value = "10";
       document.getElementById("radius2").value = "10";
-      document.getElementById("results").textContent = "";
+      document.getElementById("results").innerHTML = "";
     });
 
     function register() {
@@ -158,7 +197,7 @@
       })
       .then(res => res.json())
       .then(data => {
-        if (data.message === "Registered and logged in") {
+        if (data.message === "User registered and logged in") {
           document.getElementById("register-section").style.display = "none";
           document.getElementById("login-section").style.display = "none";
           document.getElementById("logged-in").style.display = "block";
@@ -251,7 +290,6 @@
       container.style.display = container.style.display === "none" ? "block" : "none";
     }
 
-    // Optional: Restore session state on page load
     window.addEventListener("DOMContentLoaded", () => {
       fetch("/session_status", { credentials: "include" })
         .then(res => res.json())

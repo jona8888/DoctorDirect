@@ -32,6 +32,8 @@ class User(UserMixin, db.Model):
     email    = db.Column(db.String(120), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
     created  = db.Column(db.DateTime, server_default=db.func.now())
+    
+    favorites = db.relationship('Favorite', backref='user', lazy=True)
 
     def set_password(self, plain_pw):
         self.password = generate_password_hash(plain_pw)
@@ -49,3 +51,14 @@ class Search(db.Model):
     timestamp = db.Column(db.DateTime, server_default=db.func.now())
 
     user = db.relationship("User", backref="searches")
+
+
+class Favorite(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    name = db.Column(db.String(120))
+    specialty = db.Column(db.String(200))
+    address = db.Column(db.String(300))
+    phone = db.Column(db.String(50))
+    timestamp = db.Column(db.DateTime, server_default=db.func.now())  # ✅ Add this line
+
