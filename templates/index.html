@@ -70,10 +70,17 @@
   <input type="password" id="reg-password" placeholder="Password">
   <button onclick="register()">Register</button>
 
-  <h3>Login</h3>
-  <input type="email" id="log-email" placeholder="Email">
-  <input type="password" id="log-password" placeholder="Password">
-  <button onclick="login()">Login</button>
+  <div id="login-section">
+    <h3>Login</h3>
+    <input type="email" id="log-email" placeholder="Email">
+    <input type="password" id="log-password" placeholder="Password">
+    <button onclick="login()">Login</button>
+  </div>
+
+  <div id="logged-in" style="display: none;">
+    <p id="welcome-msg"></p>
+    <button onclick="logout()">Logout</button>
+  </div>
 
   <div id="historyControls" style="display: none;">
     <hr>
@@ -138,19 +145,33 @@
     });
 
     function register() {
-      const email = document.getElementById("reg-email").value;
-      const password = document.getElementById("reg-password").value;
+  const email = document.getElementById("reg-email").value;
+  const password = document.getElementById("reg-password").value;
 
-      fetch("/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ email, password })
-      })
-      .then(res => res.json())
-      .then(data => alert("Register: " + JSON.stringify(data)))
-      .catch(err => console.error(err));
+  fetch("/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ email, password })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.message === "User registered and logged in") {
+      // Mimic login success behavior
+      document.getElementById("login-section").style.display = "none";
+      document.getElementById("logged-in").style.display = "block";
+      document.getElementById("welcome-msg").textContent = `Welcome, ${email}`;
+      document.getElementById("historyControls").style.display = "block";
+    } else {
+      alert(data.error || "Registration failed");
     }
+  })
+  .catch(err => {
+    alert("Error registering");
+    console.error(err);
+  });
+}
+
 
     function login() {
       const email = document.getElementById("log-email").value;
@@ -164,11 +185,39 @@
       })
       .then(res => res.json())
       .then(data => {
-        alert("Login: " + JSON.stringify(data));
-        // Show history section after login
-        document.getElementById("historyControls").style.display = "block";
+        if (data.message === "Logged in") {
+          document.getElementById("login-section").style.display = "none";
+          document.getElementById("logged-in").style.display = "block";
+          document.getElementById("welcome-msg").textContent = `Welcome, ${email}`;
+          document.getElementById("historyControls").style.display = "block";
+        } else {
+          alert(data.error || "Login failed");
+        }
       })
-      .catch(err => console.error(err));
+      .catch(err => {
+        alert("Error logging in");
+        console.error(err);
+      });
+    }
+
+    function logout() {
+      fetch("/logout", {
+        method: "GET",
+        credentials: "include"
+      })
+      .then(() => {
+        document.getElementById("logged-in").style.display = "none";
+        document.getElementById("login-section").style.display = "block";
+        document.getElementById("log-email").value = "";
+        document.getElementById("log-password").value = "";
+        document.getElementById("historyControls").style.display = "none";
+        document.getElementById("historyContainer").style.display = "none";
+        document.getElementById("historyBox").textContent = "";
+      })
+      .catch(err => {
+        alert("Error logging out");
+        console.error(err);
+      });
     }
 
     function getHistory() {
