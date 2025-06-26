@@ -68,6 +68,8 @@ def format_zip(zip_code):
         return zip_code[:5] + "-" + zip_code[5:]
     return zip_code
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 @app.route('/lookup', methods=['GET'])
 def lookup_doctors():
     condition = request.args.get('condition', '').lower()
@@ -83,7 +85,7 @@ def lookup_doctors():
     if not zip_code or zip_code not in zip_coords:
         return jsonify({"error": "Invalid or missing ZIP code"}), 400
 
-    # Determine specialty from condition or symptom
+    # Determine specialty
     specialty = None
     if condition and condition in condition_to_specialty:
         specialty = condition_to_specialty[condition]
@@ -99,10 +101,12 @@ def lookup_doctors():
     nearby_zips = find_nearby_zips(zip_code, radius, zip_coords)
 
     results = []
-    for z in nearby_zips:
-        url = f"https://npiregistry.cms.hhs.gov/api/?version=2.1&postal_code={z}&limit=50"
+
+    def fetch_doctors(z):
         try:
+            url = f"https://npiregistry.cms.hhs.gov/api/?version=2.1&postal_code={z}&limit=50"
             response = requests.get(url, timeout=5)
+            doctors = []
             if response.status_code == 200:
                 data = response.json()
                 for item in data.get("results", []):
@@ -111,21 +115,27 @@ def lookup_doctors():
                         basic = item.get("basic", {})
                         address = item.get("addresses", [{}])[0]
                         formatted_zip = format_zip(address.get('postal_code', ''))
-                        results.append({
+                        doctors.append({
                             "name": f"{basic.get('first_name', '')} {basic.get('last_name', '')}".strip(),
                             "specialty": ", ".join(t.get("desc", "") for t in taxonomies),
                             "address": f"{address.get('address_1', '')}, {address.get('city', '')}, {address.get('state', '')} {formatted_zip}",
                             "phone": address.get("telephone_number", "")
                         })
-            else:
-                print(f"NPI API call failed for ZIP {z} with status {response.status_code}")
+            return doctors
         except Exception as e:
-            print(f"Error querying NPI API for ZIP {z}: {e}")
+            print(f"Error fetching ZIP {z}: {e}")
+            return []
+
+    # Parallel API requests
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = [executor.submit(fetch_doctors, z) for z in nearby_zips]
+        for future in as_completed(futures):
+            results.extend(future.result())
 
     if not results:
         return jsonify({"message": "No doctors found in the selected area."})
 
-    # ✅ Log the search
+    # Save search if logged in
     if current_user.is_authenticated:
         search_entry = Search(
             user_id=current_user.id,
@@ -138,6 +148,7 @@ def lookup_doctors():
         db.session.commit()
 
     return jsonify({"results": results})
+
 
 @app.route('/register', methods=['POST'])
 def register():
