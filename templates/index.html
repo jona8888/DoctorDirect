@@ -65,10 +65,12 @@
   <pre id="results"></pre>
 
   <hr>
-  <h3>Register</h3>
-  <input type="email" id="reg-email" placeholder="Email">
-  <input type="password" id="reg-password" placeholder="Password">
-  <button onclick="register()">Register</button>
+  <div id="register-section">
+    <h3>Register</h3>
+    <input type="email" id="reg-email" placeholder="Email">
+    <input type="password" id="reg-password" placeholder="Password">
+    <button onclick="register()">Register</button>
+  </div>
 
   <div id="login-section">
     <h3>Login</h3>
@@ -145,33 +147,29 @@
     });
 
     function register() {
-  const email = document.getElementById("reg-email").value;
-  const password = document.getElementById("reg-password").value;
+      const email = document.getElementById("reg-email").value;
+      const password = document.getElementById("reg-password").value;
 
-  fetch("/register", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    body: JSON.stringify({ email, password })
-  })
-  .then(res => res.json())
-  .then(data => {
-    if (data.message === "User registered and logged in") {
-      // Mimic login success behavior
-      document.getElementById("login-section").style.display = "none";
-      document.getElementById("logged-in").style.display = "block";
-      document.getElementById("welcome-msg").textContent = `Welcome, ${email}`;
-      document.getElementById("historyControls").style.display = "block";
-    } else {
-      alert(data.error || "Registration failed");
+      fetch("/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email, password })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.message === "Registered and logged in") {
+          document.getElementById("register-section").style.display = "none";
+          document.getElementById("login-section").style.display = "none";
+          document.getElementById("logged-in").style.display = "block";
+          document.getElementById("welcome-msg").textContent = `Welcome, ${email}`;
+          document.getElementById("historyControls").style.display = "block";
+        } else {
+          alert(data.error || "Registration failed");
+        }
+      })
+      .catch(err => console.error(err));
     }
-  })
-  .catch(err => {
-    alert("Error registering");
-    console.error(err);
-  });
-}
-
 
     function login() {
       const email = document.getElementById("log-email").value;
@@ -187,6 +185,7 @@
       .then(data => {
         if (data.message === "Logged in") {
           document.getElementById("login-section").style.display = "none";
+          document.getElementById("register-section").style.display = "none";
           document.getElementById("logged-in").style.display = "block";
           document.getElementById("welcome-msg").textContent = `Welcome, ${email}`;
           document.getElementById("historyControls").style.display = "block";
@@ -208,6 +207,7 @@
       .then(() => {
         document.getElementById("logged-in").style.display = "none";
         document.getElementById("login-section").style.display = "block";
+        document.getElementById("register-section").style.display = "block";
         document.getElementById("log-email").value = "";
         document.getElementById("log-password").value = "";
         document.getElementById("historyControls").style.display = "none";
@@ -250,6 +250,22 @@
       const container = document.getElementById("historyContainer");
       container.style.display = container.style.display === "none" ? "block" : "none";
     }
+
+    // Optional: Restore session state on page load
+    window.addEventListener("DOMContentLoaded", () => {
+      fetch("/session_status", { credentials: "include" })
+        .then(res => res.json())
+        .then(data => {
+          if (data.logged_in && data.email) {
+            document.getElementById("register-section").style.display = "none";
+            document.getElementById("login-section").style.display = "none";
+            document.getElementById("logged-in").style.display = "block";
+            document.getElementById("welcome-msg").textContent = `Welcome, ${data.email}`;
+            document.getElementById("historyControls").style.display = "block";
+          }
+        })
+        .catch(err => console.error("Session check failed:", err));
+    });
   </script>
 </body>
 </html>
